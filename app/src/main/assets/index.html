@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>شركة الطود | تقارير الموقع</title>
+<style>
+:root{font-family:Tahoma,Arial,sans-serif;color:#18364b;background:#edf3f7}*{box-sizing:border-box}
+body{margin:0}header{background:linear-gradient(135deg,#116397,#2589bd);color:white;padding:22px 16px;border-radius:0 0 22px 22px}
+h1{font-size:22px;margin:0 0 8px}h2{font-size:17px;margin:6px 0 15px}header p{margin:0;font-size:13px}
+main{max-width:760px;margin:auto;padding:14px}.card{background:white;border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 3px 14px #244b6720}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}input,select,textarea{width:100%;padding:12px;border:1px solid #c5d6e1;border-radius:9px;background:white;font:inherit;font-size:15px}
+button{border:0;border-radius:10px;padding:12px 14px;background:#166d9e;color:white;font:inherit;font-weight:700;cursor:pointer;margin:4px 2px}
+button.secondary{background:#637b8b}button.danger{background:#a33c40}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid>*{min-width:0}.small{font-size:12px;color:#5c7282}
+.status{padding:10px;border-radius:10px;background:#e9f5f9;color:#24536e;margin-top:12px;display:none}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px;border-bottom:1px solid #e1eaf0;text-align:right;word-break:break-word}
+th{background:#eff6fa}.scroll{overflow-x:auto}.chip{display:inline-block;background:#eaf2f6;border-radius:20px;padding:5px 10px;margin:4px}
+img.preview{max-width:160px;max-height:140px;border-radius:10px}
+@media(max-width:450px){.grid{grid-template-columns:1fr}.card{padding:14px}}
+@media print{header{color:#111;background:none}button,.no-print,#formCard{display:none!important}main{padding:0}.card{box-shadow:none;border:1px solid #ddd}}
+</style></head>
+<body><header><h1>منظومة التحكم – شركة الطود</h1><p>تطبيق تقارير الموقع • نسخة ميدانية دون إنترنت</p></header>
+<main>
+<section class="card no-print"><h2>بيانات الموقع</h2><div class="grid">
+<div><label for="project">المشروع</label><input id="project" placeholder="اسم المشروع" list="projectOptions"></div>
+<div><label for="building">المبنى</label><input id="building" placeholder="اسم أو رقم المبنى"></div>
+</div><datalist id="projectOptions"></datalist><p class="small">البيانات مخزنة على هذا الجهاز فقط، ولا تُرسل إلى خادم الشركة.</p></section>
+<section id="formCard" class="card"><h2>تسجيل إنجاز جديد</h2>
+<div class="grid">
+<div><label for="date">التاريخ</label><input id="date" type="date"></div>
+<div><label for="engineer">المهندس أو المشرف</label><input id="engineer" placeholder="اسم المسؤول"></div>
+</div><label for="item">بند الأعمال</label><input id="item" placeholder="مثال: صب أعمدة الدور الأرضي">
+<div class="grid"><div><label for="percentage">نسبة الإنجاز الحالية (%)</label><input type="number" id="percentage" min="0" max="100" step="0.1" value="0"></div>
+<div><label for="statusSelect">حالة الأعمال</label><select id="statusSelect"><option>قيد التنفيذ</option><option>لم تبدأ</option><option>مكتملة</option><option>متوقفة</option></select></div></div>
+<label for="note">الملاحظات</label><textarea id="note" rows="3" placeholder="المعوقات والأعمال المنفذة"></textarea>
+<label for="photo">صورة ميدانية (اختيارية)</label><input type="file" accept="image/*" capture="environment" id="photo">
+<div id="preview"></div>
+<button id="add">حفظ تقرير الإنجاز</button><p id="status" class="status"></p>
+</section>
+<section class="card"><h2>ملخص وسجل التقارير</h2>
+<div id="summary"></div>
+<div class="scroll"><table><thead><tr><th>التاريخ</th><th>المشروع / المبنى</th><th>البند</th><th>الإنجاز</th><th>الحالة</th><th>المسؤول</th><th>إجراء</th></tr></thead><tbody id="records"></tbody></table></div>
+<div class="no-print" style="margin-top:12px">
+<button id="share">مشاركة واتساب / تطبيقات</button>
+<button id="csv">تصدير Excel (CSV)</button>
+<button id="pdf">حفظ PDF</button>
+<button id="backup" class="secondary">نسخة احتياطية JSON</button>
+<label for="restore">استعادة نسخة احتياطية</label><input id="restore" type="file" accept="application/json,.json">
+</div>
+</section>
+<p class="small">إصدار تجريبي: لا توجد مزامنة SQL أو حسابات مستخدمين فعلية بعد. لا تستخدم بياناته لاعتماد الدفعات المالية.</p>
+</main>
+<script>
+'use strict';
+const key='ALTOUD_FIELD_V1_DATA';
+const $=id=>document.getElementById(id);
+let entries=[];
+try{let x=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(x))entries=x;}catch(e){}
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const get=id=>$(id).value.trim();
+$('date').value=new Date().toISOString().slice(0,10);
+function save(){localStorage.setItem(key,JSON.stringify(entries));render();}
+function message(s){$('status').style.display='block';$('status').textContent=s;}
+function render(){
+ const projects=[...new Set(entries.map(x=>x.project).filter(Boolean))];
+ $('projectOptions').innerHTML=projects.map(x=>'<option value="'+esc(x)+'"></option>').join('');
+ const mean=entries.length?entries.reduce((s,x)=>s+x.pct,0)/entries.length:0;
+ $('summary').innerHTML='<span class="chip">عدد التقارير: '+entries.length+'</span><span class="chip">متوسط الإنجاز المسجل: '+mean.toFixed(1)+'%</span>';
+ $('records').innerHTML=entries.map((x,i)=>'<tr><td>'+esc(x.date)+'</td><td>'+esc(x.project)+' / '+esc(x.building)+'</td><td>'+esc(x.item)+'</td><td>'+x.pct+'%</td><td>'+esc(x.status)+'</td><td>'+esc(x.engineer)+'</td><td><button class="danger" data-remove="'+i+'">حذف</button></td></tr>').join('')||'<tr><td colspan="7">لا توجد تقارير بعد</td></tr>';
+ document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(confirm('حذف التقرير؟')){entries.splice(Number(b.dataset.remove),1);save();}});
+}
+$('add').onclick=()=>{
+ const project=get('project'),building=get('building'),item=get('item'),engineer=get('engineer');
+ const pct=Number(get('percentage'));
+ if(!project||!building||!item||!get('date')||!engineer||!Number.isFinite(pct)||pct<0||pct>100){message('أكمل المشروع والمبنى والبند والتاريخ واسم المسؤول ونسبة من 0 إلى 100.');return;}
+ const record={date:get('date'),project,building,item,engineer,pct,status:get('statusSelect'),note:get('note')};
+ const f=$('photo').files[0];
+ const finish=()=>{entries.unshift(record);try{save();message('تم حفظ التقرير على الجهاز.');$('item').value='';$('note').value='';$('photo').value='';$('preview').innerHTML='';}catch(e){entries.shift();message('لم يتم الحفظ: مساحة التخزين ممتلئة، احفظ نسخة احتياطية.');}};
+ if(f){if(f.size>1000000){message('الصورة كبيرة. اختر صورة حجمها أقل من 1 ميجابايت.');return;}const reader=new FileReader();reader.onload=()=>{record.photo=String(reader.result);finish();};reader.onerror=()=>message('تعذر قراءة الصورة');reader.readAsDataURL(f);}else finish();
+};
+$('photo').onchange=()=>{$('preview').textContent=$('photo').files[0]?.name||'';};
+function reportText(){return 'شركة الطود – تقارير الموقع\n'+entries.map(x=>[x.date,x.project,x.building,x.item,x.pct+'%',x.status,x.engineer,x.note||''].join(' | ')).join('\n');}
+$('share').onclick=()=>{
+ const s=reportText();if(window.AndroidField&&AndroidField.shareText){AndroidField.shareText(s);}else if(navigator.share){navigator.share({text:s}).catch(()=>{});}else{navigator.clipboard?.writeText(s);message('تم تجهيز النص للمشاركة.');}
+};
+function exportFile(name,data,mime){
+ if(window.AndroidField&&AndroidField.saveFile){AndroidField.saveFile(name,data,mime);return;}
+ const blob=new Blob([data],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+const csvCell=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+$('csv').onclick=()=>{
+ const header=['التاريخ','المشروع','المبنى','البند','نسبة الإنجاز','الحالة','المسؤول','الملاحظات'];
+ const lines=[header,...entries.map(x=>[x.date,x.project,x.building,x.item,x.pct,x.status,x.engineer,x.note||''])];
+ exportFile('ALTOUD_Field_Reports.csv',lines.map(row=>row.map(csvCell).join(',')).join('\r\n'),'text/csv');
+};
+$('pdf').onclick=()=>{if(window.AndroidField&&AndroidField.printPage)AndroidField.printPage();else window.print();};
+$('backup').onclick=()=>exportFile('ALTOUD_Field_Backup.json',JSON.stringify({app:'ALTOUD_FIELD',version:1,entries},null,2),'application/json');
+$('restore').onchange=async()=>{
+ const file=$('restore').files[0];if(!file)return;
+ try{let obj=JSON.parse(await file.text());if(obj.app!=='ALTOUD_FIELD'||!Array.isArray(obj.entries))throw Error('صيغة نسخة غير صالحة');
+ if(!confirm('استبدال التقارير الحالية بالنسخة الاحتياطية؟'))return;
+ entries=obj.entries.filter(x=>x&&typeof x.project==='string'&&typeof x.item==='string'&&Number.isFinite(x.pct)&&x.pct>=0&&x.pct<=100);
+ save();message('تمت استعادة '+entries.length+' تقريرًا.');}catch(e){message('تعذرت الاستعادة: '+e.message);}
+};
+render();
+</script></body></html>
